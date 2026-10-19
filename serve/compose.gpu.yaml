@@ -1,0 +1,40 @@
+services:
+  vllm:
+    image: vllm/vllm-openai:v0.11.0
+    command:
+      - Qwen/Qwen2.5-0.5B-Instruct
+      - --served-model-name
+      - qwen2.5-0.5b-instruct
+      - --enable-lora
+      - --lora-modules
+      - incident-lora=/adapters/qwen2.5-0.5b-incident-r16
+      - --max-lora-rank
+      - "16"
+      - --max-model-len
+      - "4096"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../adapters:/adapters:ro
+      - hf-cache:/root/.cache/huggingface
+    ipc: host
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  messages-shim:
+    build:
+      context: ..
+      dockerfile: serve/Dockerfile.shim
+    command: ["ilora", "shim", "--upstream", "http://vllm:8000", "--port", "8090"]
+    ports:
+      - "8090:8090"
+    depends_on:
+      - vllm
+
+volumes:
+  hf-cache:

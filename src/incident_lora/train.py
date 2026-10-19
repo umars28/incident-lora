@@ -48,6 +48,13 @@ def encode(tokenizer: Any, record: dict[str, Any], max_len: int) -> dict[str, li
     return {"input_ids": full, "labels": labels}
 
 
+def answer_span(labels: list[int]) -> int:
+    first = next(i for i, v in enumerate(labels) if v != -100)
+    if any(v == -100 for v in labels[first:]):
+        raise ValueError("answer tokens must be a contiguous suffix")
+    return len(labels) - first
+
+
 def lr_at(step: int, total: int, warmup: int, peak: float) -> float:
     if step < warmup:
         return peak * (step + 1) / max(1, warmup)
@@ -104,13 +111,20 @@ def train(config: TrainConfig, data_dir: Path, out_dir: Path) -> dict[str, Any]:
         labels = torch.tensor([example["labels"]], device=device)
         return ids, labels
 
+    def answer_loss(ids: Any, labels: Any) -> Any:
+        keep = answer_span(labels[0].tolist()) + 1
+        logits = model(input_ids=ids, logits_to_keep=keep).logits[0, :-1].float()
+        return torch.nn.functional.cross_entropy(
+            logits, labels[0, ids.shape[1] - keep + 1:], ignore_index=-100
+        )
+
     def val_loss() -> float:
         model.eval()
         total_loss = 0.0
         with torch.no_grad():
             for ex in val_set:
                 ids, labels = tensors(ex)
-                total_loss += float(model(input_ids=ids, labels=labels).loss)
+                total_loss += float(answer_loss(ids, labels))
         model.train()
         return total_loss / max(1, len(val_set))
 
@@ -120,6 +134,8 @@ def train(config: TrainConfig, data_dir: Path, out_dir: Path) -> dict[str, Any]:
     history: list[dict[str, Any]] = []
     initial_val = val_loss()
     log.write(json.dumps({"step": 0, "val_loss": initial_val}) + "\n")
+    log.flush()
+    print(json.dumps({"epoch": 0, "val_loss": initial_val}), flush=True)
     history.append({"epoch": 0, "val_loss": initial_val})
 
     started = time.perf_counter()
@@ -134,7 +150,7 @@ def train(config: TrainConfig, data_dir: Path, out_dir: Path) -> dict[str, Any]:
         for position, idx in enumerate(order):
             ids, labels = tensors(train_set[idx])
             tokens_seen += ids.shape[1]
-            loss = model(input_ids=ids, labels=labels).loss
+            loss = answer_loss(ids, labels)
             (loss / config.grad_accum).backward()
             running += float(loss)
             micro += 1
@@ -145,6 +161,8 @@ def train(config: TrainConfig, data_dir: Path, out_dir: Path) -> dict[str, Any]:
                 torch.nn.utils.clip_grad_norm_(params, 1.0)
                 optimizer.step()
                 optimizer.zero_grad(set_to_none=True)
+                if device == "mps":
+                    torch.mps.empty_cache()
                 entry = {
                     "step": step + 1,
                     "epoch": epoch + 1,

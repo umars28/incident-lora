@@ -1,0 +1,53 @@
+{
+  "config": {
+    "base_model": "Qwen/Qwen2.5-0.5B-Instruct",
+    "rank": 16,
+    "alpha": 32,
+    "dropout": 0.05,
+    "target_modules": [
+      "q_proj",
+      "k_proj",
+      "v_proj",
+      "o_proj",
+      "gate_proj",
+      "up_proj",
+      "down_proj"
+    ],
+    "learning_rate": 0.0002,
+    "epochs": 2,
+    "grad_accum": 8,
+    "warmup_ratio": 0.05,
+    "max_len": 4096,
+    "seed": 0,
+    "gradient_checkpointing": true,
+    "limit": null
+  },
+  "device": "mps",
+  "torch": "2.14.1",
+  "train_examples": 504,
+  "val_examples": 21,
+  "train_tokens_per_epoch": 827019,
+  "train_tokens_seen": 1654038,
+  "max_example_tokens": 2133,
+  "optimizer_steps": 126,
+  "trainable_params": 8798208,
+  "total_params": 502830976,
+  "trainable_pct": 1.7497,
+  "adapter_weights_bytes": 35237104,
+  "adapter_dir_bytes": 35243492,
+  "wall_clock_s": 4330.9,
+  "val_loss_history": [
+    {
+      "epoch": 0,
+      "val_loss": 2.464054584503174
+    },
+    {
+      "epoch": 1,
+      "val_loss": 0.007666604948185739
+    },
+    {
+      "epoch": 2,
+      "val_loss": 0.001915912737049872
+    }
+  ]
+}
