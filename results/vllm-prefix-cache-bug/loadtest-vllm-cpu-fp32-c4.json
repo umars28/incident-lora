@@ -1,0 +1,18 @@
+{
+  "server": "vllm",
+  "dtype": "float32",
+  "model": "incident-lora",
+  "concurrency": 4,
+  "requests": 16,
+  "succeeded": 16,
+  "failed": 0,
+  "wall_s": 158.184,
+  "requests_per_s": 0.1011,
+  "output_tokens": 3169,
+  "output_tokens_per_s": 20.03,
+  "prompt_tokens": 23391,
+  "latency_p50_s": 28.42,
+  "latency_p95_s": 74.245,
+  "latency_max_s": 75.455,
+  "failures": []
+}

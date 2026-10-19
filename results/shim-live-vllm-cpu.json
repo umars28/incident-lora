@@ -1,0 +1,23 @@
+{
+  "request": "POST /v1/messages model=incident-lora id=SC-030-test_heldout-orig",
+  "status": 200,
+  "latency_s": 9.954,
+  "response": {
+    "id": "msg_chatcmpl-9faed2ad767f4d1295a75c05ad9ad112",
+    "type": "message",
+    "role": "assistant",
+    "model": "incident-lora",
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"root_cause\": \"report-builder v3.4.0 raised a 24Gi memory limit and shipped with a 2Gi request per container, putting the node at 29.4 GiB and sending it into OOMKills. ledger-service, which needs about 14Gi, was the only pod living within the request/limit boundary, so it was evicted and all 4 of its containers died. Every other service is healthy and responding at normal load.\", \"category\": \"resource-exhaustion\", \"action_id\": \"rollback_deploy\"}"
+      }
+    ],
+    "stop_reason": "end_turn",
+    "stop_sequence": null,
+    "usage": {
+      "input_tokens": 1454,
+      "output_tokens": 119
+    }
+  }
+}

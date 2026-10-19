@@ -1,0 +1,15 @@
+{
+  "model": "Qwen/Qwen2.5-0.5B-Instruct",
+  "device": "mps",
+  "seq_len": 1607,
+  "answer_len": 127,
+  "answer_only_logits": false,
+  "gradient_checkpointing": true,
+  "warmup_s": 3.119,
+  "step_s": [
+    2.403,
+    2.338,
+    2.364
+  ],
+  "driver_bytes": 7297794048
+}

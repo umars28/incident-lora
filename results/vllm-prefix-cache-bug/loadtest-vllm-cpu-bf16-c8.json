@@ -1,0 +1,17 @@
+{
+  "model": "incident-lora",
+  "concurrency": 8,
+  "requests": 16,
+  "succeeded": 16,
+  "failed": 0,
+  "wall_s": 107.51,
+  "requests_per_s": 0.1488,
+  "output_tokens": 2883,
+  "output_tokens_per_s": 26.82,
+  "prompt_tokens": 23391,
+  "latency_p50_s": 50.156,
+  "latency_p95_s": 78.933,
+  "latency_max_s": 98.535,
+  "failures": [],
+  "dtype": "bfloat16"
+}

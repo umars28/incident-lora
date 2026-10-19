@@ -108,6 +108,19 @@ def cmd_report(args: argparse.Namespace) -> int:
     for test_set in sorted({r.get("test_set") for r in results}):
         subset = [r for r in results if r.get("test_set") == test_set]
         sections += [f"\n## Per scenario: {test_set}\n", per_scenario_table(subset)]
+    loads = [json.loads(p.read_text()) for p in sorted(results_dir.glob("loadtest-*.json"))]
+    if loads:
+        sections += [
+            "\n## Load tests\n",
+            "| server | model | concurrency | requests | ok | wall s | req/s | out tok/s | p50 s | p95 s |",
+            "|---|---|---|---|---|---|---|---|---|---|",
+        ]
+        for d in sorted(loads, key=lambda d: (d.get("server", ""), d.get("dtype", ""), d["concurrency"])):
+            sections.append(
+                f"| {d.get('server', 'vllm')} {d.get('dtype', '')} | {d['model']} | {d['concurrency']} | "
+                f"{d['requests']} | {d['succeeded']} | {d['wall_s']} | {d['requests_per_s']} | "
+                f"{d['output_tokens_per_s']} | {d['latency_p50_s']} | {d['latency_p95_s']} |"
+            )
     text = "\n".join(sections) + "\n"
     (results_dir / "RESULTS.md").write_text(text)
     print(text)
@@ -135,6 +148,20 @@ def cmd_loadtest(args: argparse.Namespace) -> int:
     prompts = [r["messages"] for r in records]
     result = asyncio.run(run_load(args.base_url, args.model, prompts, args.concurrency,
                                   args.requests, args.max_tokens))
+    result = {"server": args.server, "dtype": args.dtype, **result}
+    text = json.dumps(result, indent=2)
+    if args.out:
+        Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.out).write_text(text + "\n")
+    print(text)
+    return 0
+
+
+def cmd_bench(args: argparse.Namespace) -> int:
+    from .bench import bench_step
+
+    result = bench_step(args.model, args.seq_len, args.answer_len, not args.full_logits,
+                        not args.no_checkpointing, args.repeats)
     text = json.dumps(result, indent=2)
     if args.out:
         Path(args.out).parent.mkdir(parents=True, exist_ok=True)
@@ -217,8 +244,20 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--concurrency", type=int, default=4)
     p.add_argument("--requests", type=int, default=16)
     p.add_argument("--max-tokens", type=int, default=384)
+    p.add_argument("--server", default="vllm")
+    p.add_argument("--dtype", default="")
     p.add_argument("--out", default=None)
     p.set_defaults(fn=cmd_loadtest)
+
+    p = sub.add_parser("bench-step")
+    p.add_argument("--model", default="Qwen/Qwen2.5-0.5B-Instruct")
+    p.add_argument("--seq-len", type=int, default=1607)
+    p.add_argument("--answer-len", type=int, default=127)
+    p.add_argument("--full-logits", action="store_true")
+    p.add_argument("--no-checkpointing", action="store_true")
+    p.add_argument("--repeats", type=int, default=3)
+    p.add_argument("--out", default=None)
+    p.set_defaults(fn=cmd_bench)
 
     p = sub.add_parser("shim")
     p.add_argument("--upstream", default="http://localhost:8000")

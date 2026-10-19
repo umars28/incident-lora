@@ -7,7 +7,7 @@ services:
       - qwen2.5-0.5b-instruct
       - --enable-lora
       - --lora-modules
-      - incident-lora=/adapters/qwen2.5-0.5b-incident-r16
+      - incident-lora=/adapters/incident-lora
       - --max-lora-rank
       - "16"
       - --max-model-len
@@ -15,7 +15,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ../adapters:/adapters:ro
+      - ../runs/qwen05-r16/adapter:/adapters/incident-lora:ro
       - hf-cache:/root/.cache/huggingface
     ipc: host
     deploy:
