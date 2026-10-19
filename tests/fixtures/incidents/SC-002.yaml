@@ -1,0 +1,111 @@
+id: SC-002
+title: fixture 2
+category: resource-exhaustion
+alert:
+  name: GenericAlert
+  severity: P1
+  service: orders-api
+  fired_at: '2026-09-12T02:14:00Z'
+  description: p99 on orders-api is 4.2s, error rate climbing.
+world:
+  services:
+  - name: orders-api
+    tier: 1
+    owner: team-a
+    depends_on:
+    - postgres-primary
+    - billing-api
+  - name: billing-api
+    tier: 2
+    owner: team-b
+    depends_on: []
+  - name: postgres-primary
+    tier: 1
+    owner: platform
+    depends_on: []
+  deploys:
+  - t: -38
+    service: orders-api
+    version: v1.2.0
+    commit: 9f3c1ab
+    author: rina.p
+    summary: Add audit write
+  logs:
+    orders-api:
+    - t: -38
+      level: INFO
+      msg: Starting orders-api v1.2.0 on ip-10-4-1-5
+    - t: -10
+      level: ERROR
+      msg: could not acquire connection from pool within 5000ms
+      count: 88
+    billing-api:
+    - t: -20
+      level: INFO
+      msg: GET /stock 200 (elapsed=41ms)
+      count: 8800
+  metrics:
+    orders-api:
+      http_p99_latency_ms:
+        unit: ms
+        points:
+        - t: -60
+          v: 210
+        - t: -30
+          v: 620
+        - t: 0
+          v: 4210
+      db_pool_in_use:
+        unit: connections
+        points:
+        - t: -60
+          v: 6
+        - t: 0
+          v: 20
+      queue_depth:
+        unit: items
+        points:
+        - t: -60
+          v: 1111
+        - t: 0
+          v: 7777
+    postgres-primary:
+      max_connections:
+        unit: connections
+        points:
+        - t: -60
+          v: 400
+        - t: 0
+          v: 400
+  k8s:
+  - kind: Deployment
+    name: orders-api
+    namespace: prod
+    spec:
+      replicas: 6
+      image: registry.internal/orders-api:v1.2.0
+    status:
+      readyReplicas: 6
+    events:
+    - t: -38
+      type: Normal
+      reason: ScalingReplicaSet
+      msg: Scaled up replica set orders-api-7f9c to 6
+  runbooks:
+  - id: RB-102
+    title: Pool exhaustion
+    tags:
+    - pool
+    body: Check db_pool_in_use against db_pool_size.
+ground_truth:
+  root_cause: orders-api v1.2.0 leaks pool connections until the pool is exhausted.
+  must_include:
+  - - pool
+  - - exhaust
+    - leak
+  must_not_include:
+  - - postgres cpu
+  expected_actions:
+  - rollback_deploy
+  red_herrings:
+  - billing-api deployed but is healthy

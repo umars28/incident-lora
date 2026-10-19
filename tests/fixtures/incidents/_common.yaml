@@ -1,0 +1,18 @@
+actions:
+  - id: rollback_deploy
+    description: "Roll a service back to a previously released version"
+    risk: medium
+    params: [service, target_version]
+  - id: increase_db_pool_size
+    description: "Raise a service's database connection pool size"
+    risk: medium
+    params: [service, new_size]
+  - id: drain_node
+    description: "Cordon and drain a node"
+    risk: medium
+    params: [node]
+  - id: no_action_required
+    description: "Declare that no production change is warranted"
+    risk: low
+    params: [rationale]
+runbooks: []

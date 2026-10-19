@@ -1,0 +1,116 @@
+id: SC-001
+title: fixture 1
+category: resource-exhaustion
+alert:
+  name: CheckoutAPIHighLatency
+  severity: P1
+  service: checkout-api
+  fired_at: '2026-09-12T02:14:00Z'
+  description: p99 on checkout-api is 4.2s, error rate climbing.
+world:
+  services:
+  - name: checkout-api
+    tier: 1
+    owner: team-a
+    depends_on:
+    - postgres-primary
+    - inventory-api
+  - name: inventory-api
+    tier: 2
+    owner: team-b
+    depends_on: []
+  - name: postgres-primary
+    tier: 1
+    owner: platform
+    depends_on: []
+  deploys:
+  - t: -38
+    service: checkout-api
+    version: v2.31.0
+    commit: 9f3c1ab
+    author: rina.p
+    summary: Add audit write
+  logs:
+    checkout-api:
+    - t: -38
+      level: INFO
+      msg: Starting checkout-api v2.31.0 on ip-10-4-7-12
+    - t: -10
+      level: ERROR
+      msg: could not acquire connection from pool within 5000ms
+      count: 88
+    inventory-api:
+    - t: -20
+      level: INFO
+      msg: GET /stock 200 (elapsed=41ms)
+      count: 8800
+  metrics:
+    checkout-api:
+      http_p99_latency_ms:
+        unit: ms
+        points:
+        - t: -60
+          v: 210
+        - t: -30
+          v: 620
+        - t: 0
+          v: 4210
+      db_pool_in_use:
+        unit: connections
+        points:
+        - t: -60
+          v: 6
+        - t: 0
+          v: 20
+      queue_depth:
+        unit: items
+        points:
+        - t: -60
+          v: 1111
+        - t: 0
+          v: 7777
+    postgres-primary:
+      max_connections:
+        unit: connections
+        points:
+        - t: -60
+          v: 400
+        - t: 0
+          v: 400
+  k8s:
+  - kind: Deployment
+    name: checkout-api
+    namespace: prod
+    spec:
+      replicas: 6
+      image: registry.internal/checkout-api:v2.31.0
+    status:
+      readyReplicas: 6
+    events:
+    - t: -38
+      type: Normal
+      reason: ScalingReplicaSet
+      msg: Scaled up replica set checkout-api-7f9c to 6
+  runbooks:
+  - id: RB-101
+    title: Pool exhaustion
+    tags:
+    - pool
+    body: Check db_pool_in_use against db_pool_size.
+ground_truth:
+  root_cause: checkout-api v2.31.0 added an audit write and the connection pool saturated
+    at 20/20.
+  must_include:
+  - - connection pool
+    - pool
+  - - saturat
+    - 20/20
+  - - v2.31.0
+    - deploy
+  must_not_include:
+  - - postgres cpu
+  expected_actions:
+  - rollback_deploy
+  - increase_db_pool_size
+  red_herrings:
+  - inventory-api deployed but is healthy

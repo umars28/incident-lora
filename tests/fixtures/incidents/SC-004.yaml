@@ -1,0 +1,112 @@
+id: SC-004
+title: fixture 4
+category: network
+alert:
+  name: GenericAlert
+  severity: P1
+  service: search-api
+  fired_at: '2026-09-12T02:14:00Z'
+  description: p99 on search-api is 4.2s, error rate climbing.
+world:
+  services:
+  - name: search-api
+    tier: 1
+    owner: team-a
+    depends_on:
+    - postgres-primary
+    - index-api
+  - name: index-api
+    tier: 2
+    owner: team-b
+    depends_on: []
+  - name: postgres-primary
+    tier: 1
+    owner: platform
+    depends_on: []
+  deploys:
+  - t: -38
+    service: search-api
+    version: v3.3.3
+    commit: 9f3c1ab
+    author: rina.p
+    summary: Add audit write
+  logs:
+    search-api:
+    - t: -38
+      level: INFO
+      msg: Starting search-api v3.3.3 on ip-10-4-2-2
+    - t: -10
+      level: ERROR
+      msg: could not acquire connection from pool within 5000ms
+      count: 88
+    index-api:
+    - t: -20
+      level: INFO
+      msg: GET /stock 200 (elapsed=41ms)
+      count: 8800
+  metrics:
+    search-api:
+      http_p99_latency_ms:
+        unit: ms
+        points:
+        - t: -60
+          v: 210
+        - t: -30
+          v: 620
+        - t: 0
+          v: 4210
+      db_pool_in_use:
+        unit: connections
+        points:
+        - t: -60
+          v: 6
+        - t: 0
+          v: 20
+      queue_depth:
+        unit: items
+        points:
+        - t: -60
+          v: 1111
+        - t: 0
+          v: 7777
+    postgres-primary:
+      max_connections:
+        unit: connections
+        points:
+        - t: -60
+          v: 400
+        - t: 0
+          v: 400
+  k8s:
+  - kind: Deployment
+    name: search-api
+    namespace: prod
+    spec:
+      replicas: 6
+      image: registry.internal/search-api:v3.3.3
+    status:
+      readyReplicas: 6
+    events:
+    - t: -38
+      type: Normal
+      reason: ScalingReplicaSet
+      msg: Scaled up replica set search-api-7f9c to 6
+  runbooks:
+  - id: RB-104
+    title: Pool exhaustion
+    tags:
+    - pool
+    body: Check db_pool_in_use against db_pool_size.
+ground_truth:
+  root_cause: Node ip-10-4-2-2 has a bad NIC and search-api pods on it fail.
+  must_include:
+  - - node
+    - ip-10-4-2-2
+  - - nic
+    - network
+  must_not_include:
+  - - deploy caused
+  expected_actions:
+  - drain_node
+  red_herrings:
+  - index-api deployed but is healthy

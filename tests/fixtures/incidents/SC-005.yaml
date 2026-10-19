@@ -1,0 +1,112 @@
+id: SC-005
+title: fixture 5
+category: false-alarm
+alert:
+  name: GenericAlert
+  severity: P1
+  service: loyalty-api
+  fired_at: '2026-09-12T02:14:00Z'
+  description: p99 on loyalty-api is 4.2s, error rate climbing.
+world:
+  services:
+  - name: loyalty-api
+    tier: 1
+    owner: team-a
+    depends_on:
+    - postgres-primary
+    - points-api
+  - name: points-api
+    tier: 2
+    owner: team-b
+    depends_on: []
+  - name: postgres-primary
+    tier: 1
+    owner: platform
+    depends_on: []
+  deploys:
+  - t: -38
+    service: loyalty-api
+    version: v0.9.0
+    commit: 9f3c1ab
+    author: rina.p
+    summary: Add audit write
+  logs:
+    loyalty-api:
+    - t: -38
+      level: INFO
+      msg: Starting loyalty-api v0.9.0 on ip-10-4-3-3
+    - t: -10
+      level: ERROR
+      msg: could not acquire connection from pool within 5000ms
+      count: 88
+    points-api:
+    - t: -20
+      level: INFO
+      msg: GET /stock 200 (elapsed=41ms)
+      count: 8800
+  metrics:
+    loyalty-api:
+      http_p99_latency_ms:
+        unit: ms
+        points:
+        - t: -60
+          v: 210
+        - t: -30
+          v: 620
+        - t: 0
+          v: 4210
+      db_pool_in_use:
+        unit: connections
+        points:
+        - t: -60
+          v: 6
+        - t: 0
+          v: 20
+      queue_depth:
+        unit: items
+        points:
+        - t: -60
+          v: 1111
+        - t: 0
+          v: 7777
+    postgres-primary:
+      max_connections:
+        unit: connections
+        points:
+        - t: -60
+          v: 400
+        - t: 0
+          v: 400
+  k8s:
+  - kind: Deployment
+    name: loyalty-api
+    namespace: prod
+    spec:
+      replicas: 6
+      image: registry.internal/loyalty-api:v0.9.0
+    status:
+      readyReplicas: 6
+    events:
+    - t: -38
+      type: Normal
+      reason: ScalingReplicaSet
+      msg: Scaled up replica set loyalty-api-7f9c to 6
+  runbooks:
+  - id: RB-105
+    title: Pool exhaustion
+    tags:
+    - pool
+    body: Check db_pool_in_use against db_pool_size.
+ground_truth:
+  root_cause: A relabelled metric made loyalty-api look down; it is healthy.
+  must_include:
+  - - relabel
+    - metric
+  - - healthy
+    - artefact
+  must_not_include:
+  - - loyalty-api is down
+  expected_actions:
+  - no_action_required
+  red_herrings:
+  - points-api deployed but is healthy
