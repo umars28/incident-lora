@@ -33,7 +33,7 @@ Training cost, from `results/training/qwen05-r16-train_meta.json`:
 | training examples | 504, 827,019 tokens per epoch |
 | optimizer steps | 126 (2 epochs, effective batch 8) |
 | wall-clock time | 4330.9 s on Apple M5 (MPS) |
-| validation loss | 2.464 before training, 0.00767 after epoch 1, 0.00192 after epoch 2 |
+| validation loss | 2.464054584503174 before training, 0.007666604948185739 after epoch 1, 0.001915912737049872 after epoch 2 |
 
 ## What the numbers say
 
@@ -41,7 +41,7 @@ The adapter helps on incidents it has never seen, and the gap between the two te
 
 On the held-out scenarios, LoRA takes the 0.5B model from 11.1% to 44.4% on root cause, from 8.3% to 52.8% on choosing an acceptable action, and from 33.3% to 86.1% on producing an answer that fits the schema. The base model emits parseable JSON for all 36 held-out prompts but fills it with categories and action ids that do not exist; teaching the contract is the cheapest win LoRA delivers here. qwen3:8b, sixteen times larger and run through Ollama, still beats the adapter on every held-out metric, and it costs about three times the latency per answer on this machine.
 
-On the seen scenarios the adapter scores 19 of 21 on root cause, which is exactly the ceiling: the two misses are the two scenarios whose own ground truth text fails its keyword groups (see below). Category and action are perfect. That is what memorisation of 21 incident templates looks like, and it is why the held-out set and not this one is the headline. Validation loss fell to 0.00192 for the same reason; the validation set is drawn from training scenarios, so it measures fit, not generalisation.
+On the seen scenarios the adapter scores 19 of 21 on root cause, which is exactly the ceiling: the two misses are the two scenarios whose own ground truth text fails its keyword groups (see below). Category and action are perfect. That is what memorisation of 21 incident templates looks like, and it is why the held-out set and not this one is the headline. Validation loss fell to 0.001915912737049872 for the same reason; the validation set is drawn from training scenarios, so it measures fit, not generalisation.
 
 Category accuracy on held-out incidents is the weakest result: 9 of 36 for the adapter. Five of the 21 training scenarios are `resource-exhaustion`, and the adapter labels most unfamiliar incidents that way. The per-scenario table in `results/RESULTS.md` shows it never once labels SC-022 (a health check path change) as `config-error` or SC-029 (a Kafka rebalance loop) as `dependency-failure`. qwen3:8b also gets 0 of 4 on SC-015, SC-022, SC-029 and SC-030 for category, which suggests part of the problem is the taxonomy itself rather than the model.
 
@@ -49,7 +49,7 @@ The root cause metric deserves a caveat. It is the keyword scorer from llm-platf
 
 ## The task
 
-The input is one incident from `llm-platform/benchmarks/incidents`, rendered as text: the alert, the service graph, deploys, logs, metric series, Kubernetes objects and the scenario's runbooks. A rendered incident is about 1,600 tokens (median 1607, max 2133 in training, counted with the Qwen tokenizer by `ilora stats`). The system prompt lists the ten categories and the 25 remediation actions from the shared catalogue, so the base model and the adapter see exactly the same instructions.
+The input is one incident from `llm-platform/benchmarks/incidents`, rendered as text: the alert, the service graph, deploys, logs, metric series, Kubernetes objects and the scenario's runbooks. A training example, prompt plus answer, has a median of 1,607 tokens and a maximum of 2,133 (counted with the Qwen tokenizer by `ilora stats`). The system prompt lists the ten categories and the 25 remediation actions from the shared catalogue, so the base model and the adapter see exactly the same instructions.
 
 The expected output is one JSON object:
 
@@ -78,7 +78,7 @@ The scenarios are read from the sibling `llm-platform` checkout rather than copi
 
 ## Training
 
-`ilora train` is a plain PyTorch loop over `transformers` and `peft`, about two hundred lines, with no Trainer. LoRA rank 16, alpha 32, dropout 0.05, applied to all seven projection matrices in every block (q, k, v, o, gate, up, down). AdamW at a peak learning rate of 2e-4 with 5% linear warmup and cosine decay, gradient clipping at 1.0, batch size 1 with 8 steps of gradient accumulation, two epochs, bf16 base weights with fp32 adapter weights, gradient checkpointing on.
+`ilora train` is a plain PyTorch loop over `transformers` and `peft`, 212 lines, with no Trainer. LoRA rank 16, alpha 32, dropout 0.05, applied to all seven projection matrices in every block (q, k, v, o, gate, up, down). AdamW at a peak learning rate of 2e-4 with 5% linear warmup and cosine decay, gradient clipping at 1.0, batch size 1 with 8 steps of gradient accumulation, two epochs, bf16 base weights with fp32 adapter weights, gradient checkpointing on.
 
 Loss is computed on the answer tokens only. The median prompt is 1,479 tokens and the median answer 127, so a loss over the whole sequence would mostly train the model to predict incident logs. The loop also asks the model for only the last few logits (`logits_to_keep`) instead of a 1,607 by 151,936 matrix. `ilora bench-step` measures one LoRA forward and backward pass at the median training length: with full logits the Metal driver held 7,297,794,048 bytes, with answer-only logits 3,394,977,792, at similar speed (2.338 to 2.403 s against 2.16 to 2.206 s per step, `results/bench/`). Memory was the constraint that mattered here. Docker Desktop and other workloads held most of the 24 GB during training, swap was nearly full, and the 4330.9 s wall-clock time over 1,008 forward and backward passes reflects that; treat it as an upper bound for this hardware.
 
