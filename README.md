@@ -4,6 +4,21 @@ A LoRA adapter for Qwen2.5-0.5B-Instruct, trained with Hugging Face PEFT to read
 
 The organising rule comes from [llm-platform](../llm-platform): every claim in this README is a number produced by a command you can run. The commands are at the bottom, and every number below can be found in a file under `results/`.
 
+## At a glance
+
+| | |
+|---|---|
+| **Task** | Read a production incident (alert, logs, metrics, Kubernetes objects, runbooks) and return a JSON diagnosis: root cause, failure category, remediation action. |
+| **Model** | Qwen2.5-0.5B-Instruct + LoRA (PEFT). It trains 1.75% of the parameters, and the adapter is 35 MB. Training took about 72 minutes on an Apple M5 laptop. |
+| **Headline result** | On 9 incident scenarios never seen in training (36 prompts), LoRA raises root cause hits from **11.1% → 44.4%**, correct action from **8.3% → 52.8%**, and schema-valid answers from **33.3% → 86.1%**. |
+| **Honest comparison** | qwen3:8b (16× larger) still wins on every held-out metric (41.7% vs 27.8% strict correct), at about 3× the latency per answer. The adapter's near-perfect seen-scenario score is reported as memorisation, not as the headline. |
+| **No leakage** | Whole scenarios are held out by a mechanical rule. The build checks for 0 identical prompts across splits and at most 1.54% shared 5-grams with training targets. The checks are recorded in `results/dataset_manifest.json`. |
+| **Serving** | vLLM serves the base model and the adapter side by side on one OpenAI-compatible endpoint. Results are load-tested at concurrency 1/4/8. A small shim exposes it on the Anthropic Messages API for [llm-gateway](https://github.com/umars28/llm-platform). |
+| **Found along the way** | A vLLM prefix-caching bug turned every answer after the first into prose (0/36 valid JSON). It was reproduced in both dtypes, isolated, and the failing runs are kept in `results/vllm-prefix-cache-bug/`. Two source scenarios had ground truth that fails its own scorer. |
+| **Stack** | Python, PyTorch (MPS), Hugging Face Transformers + PEFT, vLLM, uv, pytest |
+
+Every number above comes from the tables below and the JSON files in `results/`.
+
 ## Results
 
 Held-out set: 36 prompts built from 9 incident scenarios that never appear in training, 4 prompts per scenario (the original plus 3 variants).
